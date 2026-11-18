@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aventura Algorítmica - Java + HTML + CSS</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <main class="container">
+        <header>
+            <span class="badge">JAVA BACKEND ENGINE</span>
+            <h1>Aventura Algorítmica</h1>
+        </header>
+
+        <section class="card historia">
+            <h2>{{TITULO}}</h2>
+            <p class="narrativa">{{TEXTO}}</p>
+            <div class="opcoes">
+                {{OPCOES}}
+            </div>
+        </section>
+
+        <section class="card debug">
+            <h3>Raio-X do Algoritmo (Estado no Servidor Java)</h3>
+            <div class="info-grid">
+                <div class="info-box">
+                    <span class="label">Vértice Atual (cenaAtual):</span>
+                    <code>{{DEBUG_CENA}}</code>
+                </div>
+                <div class="info-box">
+                    <span class="label">Set&lt;String&gt; inventario:</span>
+                    <code>{{INVENTARIO}}</code>
+                </div>
+            </div>
+            <div class="log-box">
+                <span class="label">Última Execução:</span>
+                <code>{{DEBUG_LOG}}</code>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
