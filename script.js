@@ -1,21 +1,22 @@
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import java.awt.Desktop;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public class ServidorAventura {
-
-    // =========================================================================
-    // MODELAGEM DO GRAFO E ESTADO DO JOGO (ESTRUTURAS DE DADOS)
-    // =========================================================================
 
     static class Aresta {
         final String rotulo;
@@ -39,9 +40,9 @@ public class ServidorAventura {
         final String nomeCurto;
         final String titulo;
         final String descricao;
-        final String tipoEnigma; // "binario", "recursao" ou null
+        final String tipoEnigma;
         final boolean ehFinal;
-        final int x, y; // Coordenadas no mapa SVG
+        final int x, y;
         final List<Aresta> arestas = new ArrayList<>();
 
         Cena(String id, String nomeCurto, String titulo, String descricao,
@@ -86,14 +87,28 @@ public class ServidorAventura {
     public static void main(String[] args) throws IOException {
         construirGrafo();
 
-        HttpServer server = HttpServer.create(new InetSocketAddress(8080), 0);
+        // Tenta iniciar na porta 8080; se estiver ocupada, escolhe uma porta livre automaticamente
+        HttpServer server;
+        try {
+            server = HttpServer.create(new InetSocketAddress(8080), 0);
+        } catch (IOException e) {
+            server = HttpServer.create(new InetSocketAddress(0), 0);
+        }
+
+        int porta = server.getAddress().getPort();
+        String urlLocal = "http://localhost:" + porta;
 
         server.createContext("/style.css", exchange -> {
-            byte[] css = Files.readAllBytes(Paths.get("style.css"));
-            exchange.getResponseHeaders().set("Content-Type", "text/css; charset=UTF-8");
-            exchange.sendResponseHeaders(200, css.length);
-            try (OutputStream os = exchange.getResponseBody()) {
-                os.write(css);
+            try {
+                byte[] css = lerArquivoRecurso("style.css");
+                exchange.getResponseHeaders().set("Content-Type", "text/css; charset=UTF-8");
+                exchange.sendResponseHeaders(200, css.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(css);
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                exchange.sendResponseHeaders(404, -1);
             }
         });
 
@@ -101,14 +116,48 @@ public class ServidorAventura {
         server.start();
 
         System.out.println("====================================================");
-        System.out.println("  AVENTURA ALGORÍTMICA INICIADA!");
-        System.out.println("  Acesse no navegador: http://localhost:8080");
+        System.out.println("  SERVIDOR ATIVO! NÃO FECHE ESTA JANELA.");
+        System.out.println("  Abra no navegador: " + urlLocal);
         System.out.println("====================================================");
+
+        // Abre o navegador automaticamente
+        try {
+            if (Desktop.isDesktopSupported()) {
+                Desktop.getDesktop().browse(new URI(urlLocal));
+            }
+        } catch (Exception ignored) {
+        }
     }
 
-    // =========================================================================
-    // CONSTRUÇÃO DOS VÉRTICES E ARESTAS DO GRAFO
-    // =========================================================================
+    // Procura o arquivo na pasta atual, na pasta src/ ou no classpath da IDE
+    private static byte[] lerArquivoRecurso(String nomeArquivo) throws IOException {
+        Path[] caminhosPossiveis = {
+            Paths.get(nomeArquivo),
+            Paths.get("src", nomeArquivo),
+            Paths.get("bin", nomeArquivo)
+        };
+
+        for (Path p : caminhosPossiveis) {
+            if (Files.exists(p)) {
+                return Files.readAllBytes(p);
+            }
+        }
+
+        try (InputStream is = ServidorAventura.class.getResourceAsStream("/" + nomeArquivo)) {
+            if (is != null) {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                byte[] dados = new byte[4096];
+                int lidos;
+                while ((lidos = is.read(dados)) != -1) {
+                    buffer.write(dados, 0, lidos);
+                }
+                return buffer.toByteArray();
+            }
+        }
+
+        throw new IOException("Arquivo não encontrado: " + nomeArquivo
+                + ". Coloque-o na mesma pasta de ServidorAventura.java.");
+    }
 
     private static void construirGrafo() {
         GRAFO.clear();
@@ -249,7 +298,6 @@ public class ServidorAventura {
             e -> true, null
         );
 
-        // NÓS FINAIS
         GRAFO.put("entrada", entrada);
         GRAFO.put("biblioteca", biblioteca);
         GRAFO.put("estacao_ram", estacaoRam);
@@ -286,37 +334,44 @@ public class ServidorAventura {
         ));
     }
 
-    // =========================================================================
-    // PROCESSAMENTO DE REQUISIÇÕES HTTP E LÓGICA DE TRANSIÇÃO
-    // =========================================================================
-
     private static void tratarRequisicao(HttpExchange exchange) throws IOException {
-        String path = exchange.getRequestURI().getPath();
-        if (!path.equals("/")) {
-            exchange.sendResponseHeaders(404, -1);
-            return;
-        }
+        try {
+            String path = exchange.getRequestURI().getPath();
+            if (!path.equals("/")) {
+                exchange.sendResponseHeaders(404, -1);
+                return;
+            }
 
-        Map<String, String> params = lerParametros(exchange.getRequestURI().getRawQuery());
+            Map<String, String> params = lerParametros(exchange.getRequestURI().getRawQuery());
 
-        if (params.containsKey("reset")) {
-            estado = new EstadoJogo();
-        } else if (params.containsKey("voltar")) {
-            executarPopPilha();
-        } else if (params.containsKey("enigma")) {
-            processarEnigma(params.get("enigma"), params.getOrDefault("resposta", ""));
-        } else if (params.containsKey("acao")) {
-            int idx = Integer.parseInt(params.get("acao"));
-            executarAresta(idx);
-        }
+            if (params.containsKey("reset")) {
+                estado = new EstadoJogo();
+            } else if (params.containsKey("voltar")) {
+                executarPopPilha();
+            } else if (params.containsKey("enigma")) {
+                processarEnigma(params.get("enigma"), params.getOrDefault("resposta", ""));
+            } else if (params.containsKey("acao")) {
+                int idx = Integer.parseInt(params.get("acao"));
+                executarAresta(idx);
+            }
 
-        String html = renderizarHtml();
-        byte[] bytes = html.getBytes(StandardCharsets.UTF_8);
+            String html = renderizarHtml();
+            byte[] bytes = html.getBytes(StandardCharsets.UTF_8);
 
-        exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
-        exchange.sendResponseHeaders(200, bytes.length);
-        try (OutputStream os = exchange.getResponseBody()) {
-            os.write(bytes);
+            exchange.getResponseHeaders().set("Content-Type", "text/html; charset=UTF-8");
+            exchange.sendResponseHeaders(200, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            String erro = "Erro no servidor Java: " + e.getMessage();
+            byte[] bytes = erro.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
+            exchange.sendResponseHeaders(500, bytes.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(bytes);
+            }
         }
     }
 
@@ -331,7 +386,6 @@ public class ServidorAventura {
             escolhida.aoExecutar.accept(estado);
         }
 
-        // Se a aresta muda de vértice, atualiza grafo, pilha e consome RAM
         if (!escolhida.destinoId.equals(estado.cenaAtual)) {
             estado.energiaRAM -= 10;
             estado.cenaAtual = escolhida.destinoId;
@@ -407,14 +461,9 @@ public class ServidorAventura {
         }
     }
 
-    // =========================================================================
-    // RENDERIZAÇÃO DINÂMICA DO HTML E DO MAPA SVG
-    // =========================================================================
-
     private static String renderizarHtml() throws IOException {
         Cena cena = GRAFO.get(estado.cenaAtual);
 
-        // 1. Botões de Ação (Arestas visíveis + Pop da Pilha + Reset)
         StringBuilder botoesHtml = new StringBuilder();
         for (int i = 0; i < cena.arestas.size(); i++) {
             Aresta a = cena.arestas.get(i);
@@ -433,7 +482,6 @@ public class ServidorAventura {
             botoesHtml.append("<a class='btn' href='/?reset=true'>↻ Reiniciar Sistema (new EstadoJogo())</a>");
         }
 
-        // 2. Formulário de Enigma (se a cena atual possuir um)
         String formHtml = "";
         if ("binario".equals(cena.tipoEnigma) && !estado.inventario.contains("Token Booleano")) {
             formHtml = "<form class='enigma-box' action='/' method='GET'>"
@@ -453,7 +501,6 @@ public class ServidorAventura {
                      + "</div></form>";
         }
 
-        // 3. Badges do Inventário
         StringBuilder invHtml = new StringBuilder();
         if (estado.inventario.isEmpty()) {
             invHtml.append("<span class='tag-vazia'>[ ] Nenhum item coletado</span>");
@@ -463,17 +510,15 @@ public class ServidorAventura {
             }
         }
 
-        // 4. Pilha de Navegação (Deque)
         StringBuilder pilhaHtml = new StringBuilder();
         for (String no : estado.pilhaCaminho) {
             pilhaHtml.append("<span class='stack-item'>").append(no).append("</span>");
         }
 
-        // 5. Cálculo de Exploração e Cor da Barra de RAM
         int exploracaoPct = (int) Math.round((estado.visitados.size() * 100.0) / GRAFO.size());
         String corEnergia = estado.energiaRAM > 50 ? "#10b981" : (estado.energiaRAM > 25 ? "#f59e0b" : "#ef4444");
 
-        String template = new String(Files.readAllBytes(Paths.get("index.html")), StandardCharsets.UTF_8);
+        String template = new String(lerArquivoRecurso("index.html"), StandardCharsets.UTF_8);
         return template
                 .replace("{{TITULO}}", cena.titulo)
                 .replace("{{SUBTITULO_NO}}", "Vértice: " + cena.id)
@@ -495,7 +540,6 @@ public class ServidorAventura {
         StringBuilder svg = new StringBuilder();
         svg.append("<svg viewBox='0 0 830 370' class='mapa-svg'>");
 
-        // Desenhar arestas (linhas)
         for (Cena origem : GRAFO.values()) {
             for (Aresta a : origem.arestas) {
                 Cena destino = GRAFO.get(a.destinoId);
@@ -512,7 +556,6 @@ public class ServidorAventura {
             }
         }
 
-        // Desenhar vértices (círculos e rótulos)
         for (Cena c : GRAFO.values()) {
             if (c.id.equals("fim_secreto") && !estado.visitados.contains("fim_secreto")) continue;
 
@@ -535,14 +578,14 @@ public class ServidorAventura {
         return svg.toString();
     }
 
-    private static Map<String, String> lerParametros(String rawQuery) {
+    private static Map<String, String> lerParametros(String rawQuery) throws IOException {
         Map<String, String> mapa = new HashMap<>();
         if (rawQuery == null || rawQuery.isEmpty()) return mapa;
         for (String par : rawQuery.split("&")) {
             String[] kv = par.split("=", 2);
             if (kv.length == 2) {
-                String k = URLDecoder.decode(kv[0], StandardCharsets.UTF_8);
-                String v = URLDecoder.decode(kv[1], StandardCharsets.UTF_8);
+                String k = URLDecoder.decode(kv[0], "UTF-8");
+                String v = URLDecoder.decode(kv[1], "UTF-8");
                 mapa.put(k, v);
             }
         }
