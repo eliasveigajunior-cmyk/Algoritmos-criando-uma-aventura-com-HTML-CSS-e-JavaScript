@@ -3,41 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Aventura Algorítmica - Java + HTML + CSS</title>
+    <title>Aventura Algorítmica — Java OO + Grafo SVG</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
-    <main class="container">
-        <header>
-            <span class="badge">JAVA BACKEND ENGINE</span>
-            <h1>Aventura Algorítmica</h1>
+    <div class="wrapper">
+        <header class="topo">
+            <div>
+                <span class="badge">JAVA OO ENGINE • GRAFO + PILHA</span>
+                <h1>Aventura Algorítmica: O Templo do Código</h1>
+            </div>
+            <div class="metricas">
+                <div class="metrica-card">
+                    <span>Memória RAM</span>
+                    <strong style="color: {{COR_ENERGIA}};">{{ENERGIA}}%</strong>
+                    <div class="barra-fundo">
+                        <div class="barra-preenchimento" style="width: {{ENERGIA}}%; background: {{COR_ENERGIA}};"></div>
+                    </div>
+                </div>
+                <div class="metrica-card">
+                    <span>Pontuação</span>
+                    <strong class="xp">{{PONTOS}} XP</strong>
+                </div>
+                <div class="metrica-card">
+                    <span>Grafo Explorado</span>
+                    <strong>{{EXPLORACAO_PCT}}%</strong>
+                </div>
+            </div>
         </header>
 
-        <section class="card historia">
-            <h2>{{TITULO}}</h2>
-            <p class="narrativa">{{TEXTO}}</p>
-            <div class="opcoes">
-                {{OPCOES}}
-            </div>
-        </section>
+        <main class="grid-principal">
+            <!-- COLUNA ESQUERDA: NARRATIVA, ENIGMAS E DECISÕES -->
+            <section class="card historia">
+                <div class="cena-header">
+                    <span class="tag-no">{{SUBTITULO_NO}}</span>
+                </div>
+                <h2>{{TITULO}}</h2>
+                <p class="narrativa">{{TEXTO}}</p>
 
-        <section class="card debug">
-            <h3>Raio-X do Algoritmo (Estado no Servidor Java)</h3>
-            <div class="info-grid">
-                <div class="info-box">
-                    <span class="label">Vértice Atual (cenaAtual):</span>
-                    <code>{{DEBUG_CENA}}</code>
+                {{FEEDBACK_BANNER}}
+                {{FORMULARIO_ENIGMA}}
+
+                <div class="opcoes">
+                    {{OPCOES}}
                 </div>
-                <div class="info-box">
-                    <span class="label">Set&lt;String&gt; inventario:</span>
-                    <code>{{INVENTARIO}}</code>
-                </div>
-            </div>
-            <div class="log-box">
-                <span class="label">Última Execução:</span>
-                <code>{{DEBUG_LOG}}</code>
-            </div>
-        </section>
-    </main>
+            </section>
+
+            <!-- COLUNA DIREITA: RAIO-X DAS ESTRUTURAS DE DADOS -->
+            <aside class="painel-tecnico">
+                <section class="card">
+                    <h3>Mapa do Grafo em Tempo Real (SVG)</h3>
+                    <div class="mapa-container">
+                        {{SVG_MAPA}}
+                    </div>
+                    <div class="legenda">
+                        <span><i class="dot atual"></i> Nó Atual</span>
+                        <span><i class="dot visitado"></i> Visitado</span>
+                        <span><i class="dot oculto"></i> Não Explorado</span>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <h3>Set&lt;String&gt; inventario</h3>
+                    <div class="tags-container">
+                        {{INVENTARIO_HTML}}
+                    </div>
+                </section>
+
+                <section class="card">
+                    <h3>Deque&lt;String&gt; pilhaCaminho (Topo → Base)</h3>
+                    <div class="stack-container">
+                        {{PILHA_HTML}}
+                    </div>
+                    <div class="log-terminal">
+                        <span>Console Java:</span>
+                        <code>{{LOG_EXECUCAO}}</code>
+                    </div>
+                </section>
+            </aside>
+        </main>
+    </div>
 </body>
 </html>
